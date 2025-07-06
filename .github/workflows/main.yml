@@ -14,23 +14,22 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y git build-essential cmake curl
+        sudo apt install -y git build-essential curl
 
-    - name: Clone ccminer
+    - name: Clone ccminer (monkins1010)
       run: |
-        git clone https://github.com/veruscoin/ccminer.git ccminer
+        git clone https://github.com/monkins1010/ccminer.git
 
     - name: Build ccminer
       run: |
         cd ccminer
-        mkdir build && cd build
-        cmake ..
         make -j$(nproc)
 
-    - name: Start mining Verus (hybrid mode, no idle watchdog)
+    - name: Start mining (Luckpool Hybrid Mode)
       run: |
-        cd ccminer/build
+        cd ccminer
 
+        # ————— KONFIGURASI —————
         WALLET="RGVmtuvrP2yX8q3U4up77CcSpkcVhp4bUG"
         POOL="stratum+tcp://ap.luckpool.net:3956#xnsub"
         PASSWORD="hybrid"
@@ -48,7 +47,7 @@ jobs:
             -d text="$1"
         }
 
-        send_telegram "⛏️ *Mining dimulai* di *$WORKER* (hybrid), *$THREADS* thread."
+        send_telegram "⛏️ *Mining dimulai* sebagai *$WORKER* (mode *hybrid*, AP) dengan *$THREADS* thread."
 
         ./ccminer -a verus -o $POOL -u $WALLET.$WORKER -p $PASSWORD -t $THREADS | tee "$LOG_FILE" &
         MINER_PID=$!
