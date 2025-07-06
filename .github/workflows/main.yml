@@ -20,7 +20,7 @@ jobs:
       run: |
         git clone https://github.com/VerusCoin/ccminer.git
         cd ccminer
-        git checkout LinuxCPU        # branch yang benar untuk CPU miner
+        git checkout Linux_Cpu  # ← FIXED HERE
 
     - name: Build ccminer
       run: |
