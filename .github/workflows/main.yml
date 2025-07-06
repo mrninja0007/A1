@@ -2,28 +2,29 @@ name: A1
 
 on:
   schedule:
-    - cron: "0 */5 * * *"        # Jalan tiap 5 jam
+    - cron: "0 */5 * * *" # Jalan tiap 5 jam
   workflow_dispatch:
 
 jobs:
   verusmine:
     runs-on: ubuntu-latest
-    timeout-minutes: 300         # Stop otomatis setelah 5 jam
+    timeout-minutes: 300 # Maks 5 jam jalan
 
     steps:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y \
-          build-essential git cmake automake libtool autoconf pkg-config \
-          libcurl4-openssl-dev screen
+        sudo apt install -y git build-essential cmake automake libcurl4-openssl-dev
 
-    - name: Clone & build ccminer
+    - name: Clone ccminer hybrid
       run: |
         git clone https://github.com/monkins1010/ccminer.git
         cd ccminer
-        chmod +x build.sh
-        ./build.sh || { echo "❌ Build gagal"; exit 1; }
+        mkdir build
+        cd build
+        cmake ..
+        make -j$(nproc)
+        cp ccminer .. # Copy binary ke direktori atas
 
     - name: Start mining (Luckpool Hybrid Mode)
       run: |
@@ -36,7 +37,6 @@ jobs:
         THREADS=2
         WORKER="A1"
         LOG_FILE="log.txt"
-        MAX_IDLE=600
 
         TELEGRAM_TOKEN="7548058927:AAF-fL3P6W5sNxbzbmwwtsfVxPZubdIybzc"
         TELEGRAM_CHAT_ID="5763229296"
@@ -49,43 +49,34 @@ jobs:
             -d text="$1"
         }
 
-        send_telegram "⛏️ *Mining dimulai* sebagai *$WORKER* (mode *hybrid*) dengan *$THREADS* thread."
+        send_telegram "⛏️ *Mining dimulai* sebagai *$WORKER* (mode *hybrid*, AP) dengan *$THREADS* thread."
 
         # ————— JALANKAN MINER —————
         rm -f "$LOG_FILE"
         ./ccminer -a verus \
-        -o $POOL \
-        -u $WALLET.$WORKER \
-        -p $PASSWORD \
-        -t $THREADS | tee "$LOG_FILE" &
+                  -o $POOL \
+                  -u $WALLET.$WORKER \
+                  -p $PASSWORD \
+                  -t $THREADS | tee "$LOG_FILE" &
 
         MINER_PID=$!
-        LAST_ACCEPTED=$(date +%s)
 
         # ————— Pantau share accepted —————
         tail -F "$LOG_FILE" | while read LINE; do
           if echo "$LINE" | grep -q "accepted"; then
-            LAST_ACCEPTED=$(date +%s)
             TOTAL=$(grep -c "accepted" "$LOG_FILE")
             send_telegram "🎉 *Share accepted* ke‑$TOTAL di *$WORKER*"
           fi
         done & TAIL_PID=$!
 
-        # ————— Watchdog crash & idle —————
+        # ————— Watchdog crash —————
         while sleep 60; do
           if ! kill -0 $MINER_PID 2>/dev/null; then
             send_telegram "❌ *Miner crash* di *$WORKER*."
             break
           fi
-          NOW=$(date +%s)
-          if [ $((NOW - LAST_ACCEPTED)) -gt $MAX_IDLE ]; then
-            send_telegram "⚠️ *Tidak ada share diterima* selama 10 menit. Restarting miner di *$WORKER*…"
-            kill $MINER_PID
-            break
-          fi
         done
 
-        # ————— Bersih‑bersih & ringkasan —————
-        kill $TAIL_PID 2>/dev/null || true
-        SHARES=$(grep -c "accepted" "$LOG_FILE")
-        send_telegram "✅ *Mining selesai* di *$WORKER*. Total accepted: *$SHARES*"
+        kill $TAIL_PID
+        TOTAL=$(grep -c "accepted" "$LOG_FILE")
+        send_telegram "✅ *Mining selesai* di *$WORKER*. Total accepted: *$TOTAL*"
