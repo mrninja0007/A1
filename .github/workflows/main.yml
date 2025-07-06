@@ -53,11 +53,11 @@ jobs:
 
         # ————— JALANKAN MINER —————
         rm -f "$LOG_FILE"
-        ./ccminer -a verus \            # ← path diperbaiki
-                  -o $POOL \
-                  -u $WALLET.$WORKER \
-                  -p $PASSWORD \
-                  -t $THREADS | tee "$LOG_FILE" &
+        ./ccminer -a verus \
+        -o $POOL \
+        -u $WALLET.$WORKER \
+        -p $PASSWORD \
+        -t $THREADS | tee "$LOG_FILE" &
 
         MINER_PID=$!
         LAST_ACCEPTED=$(date +%s)
