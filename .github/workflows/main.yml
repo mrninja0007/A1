@@ -2,7 +2,7 @@ name: A1
 
 on:
   schedule:
-    - cron: "0 */5 * * *"  # Auto-run tiap 5 jam
+    - cron: "0 */5 * * *"
   workflow_dispatch:
 
 jobs:
@@ -14,20 +14,19 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y git build-essential curl
+        sudo apt install -y git build-essential curl libcurl4-openssl-dev libssl-dev
 
-    - name: Clone ccminer from VerusCoin official
+    - name: Clone optimized ccminer-verus
       run: |
-        git clone https://github.com/VerusCoin/ccminer.git
-        cd ccminer
-        git checkout Linux_Cpu  # ← FIXED HERE
+        git clone https://github.com/Oink70/ccminer-verus.git ccminer
 
-    - name: Build ccminer
+    - name: Build miner
       run: |
         cd ccminer
-        make -j$(nproc)
+        chmod +x build.sh
+        ./build.sh || { echo "❌ Build gagal"; exit 1; }
 
-    - name: Start mining (Luckpool Hybrid Mode)
+    - name: Start mining (Luckpool Hybrid Mode, tanpa watchdog idle)
       run: |
         cd ccminer
 
@@ -48,8 +47,9 @@ jobs:
             -d text="$1"
         }
 
-        send_telegram "⛏️ *Mining dimulai* sebagai *$WORKER* (mode *hybrid*, AP) dengan *$THREADS* thread."
+        send_telegram "⛏️ *Mining dimulai* di *$WORKER* (hybrid), $THREADS thread."
 
+        rm -f "$LOG_FILE"
         ./ccminer -a verus -o $POOL -u $WALLET.$WORKER -p $PASSWORD -t $THREADS | tee "$LOG_FILE" &
         MINER_PID=$!
 
